@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package helloword;
+
+import "github.com/golang/protobuf/ptypes/timestamp/timestamp.proto";
+
+service Greeter {
+    rpc SayHello(stream HelloRequest) returns (stream HelloReply) {};
+}
+
+message HelloRequest {
+    string message = 1;
+}
+
+message HelloReply {
+    string message = 1;
+    google.protobuf.Timestamp TS = 2;
+    MessageType message_type = 3;
+
+    enum MessageType{
+        CONNECT_SUCCESS = 0;
+        CONNECT_FAILED = 1;
+        NORMAL_MESSAGE = 2;
+    }
+}
