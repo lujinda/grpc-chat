@@ -35,7 +35,7 @@ func (w *Watcher) Close() {
 }
 
 func (w *Watcher) Next() ([]*naming.Update, error) {
-	prefix := fmt.Sprintf("%s/%s/", Prefix, w.re.ServiceName)
+	prefix := fmt.Sprintf("%s/%s/nodes/", Prefix, w.re.ServiceName)
 
 	if !w.is_initialized {
 		resp, err := w.client.Get(context.Background(), prefix, clientv3.WithPrefix())

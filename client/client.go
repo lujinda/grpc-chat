@@ -16,7 +16,9 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 
 	pb "grpclb/helloword"
 )
@@ -24,6 +26,7 @@ import (
 var name *string = flag.String("name", "guess", "what's your name?")
 var reg *string = flag.String("reg", "http://127.0.0.1:2479", "register etcd address")
 var serv *string = flag.String("service", "chat_service", "service name")
+var cert_file *string = flag.String("cert", "", "cert file")
 var mutex sync.Mutex
 
 func ConsoleLog(message string) {
@@ -71,7 +74,6 @@ func (robot *Robot) Connect() error {
 	if robot.conn != nil {
 		robot.conn.Close()
 	}
-
 	r := grpclb.NewResolver(*serv)
 	lb := grpc.RoundRobin(r)
 
@@ -79,10 +81,22 @@ func (robot *Robot) Connect() error {
 	robot.ctx = ctx
 	robot.cancel = cancel
 
-	conn, err := grpc.DialContext(ctx, *reg, grpc.WithInsecure(),
+	options := []grpc.DialOption{
 		grpc.WithDecompressor(grpc.NewGZIPDecompressor()),
 		grpc.WithCompressor(grpc.NewGZIPCompressor()),
-		grpc.WithBalancer(lb), grpc.WithBlock())
+		grpc.WithBalancer(lb),
+		grpc.WithBlock(),
+		grpc.WithTimeout(10 * time.Second),
+	}
+	if *cert_file != "" {
+		creds, err := credentials.NewClientTLSFromFile(*cert_file, "duoshoubang")
+		utils.CheckErrorPanic(err)
+		options = append(options, grpc.WithTransportCredentials(creds))
+	} else {
+		options = append(options, grpc.WithInsecure())
+	}
+	conn, err := grpc.DialContext(ctx, *reg, options...)
+	utils.CheckErrorPanic(err)
 
 	if err != nil {
 		return errors.Wrap(err, "Client Connect")
@@ -110,11 +124,11 @@ func (robot *Robot) GetChatStream() pb.Greeter_SayHelloClient {
 			time.Sleep(1 * time.Second)
 		} else {
 			robot.chat_stream = stream
-			return robot.chat_stream
+			break
 		}
 	}
 
-	return nil
+	return robot.chat_stream
 }
 
 func (robot *Robot) Login(username string) error {
@@ -152,7 +166,8 @@ func main() {
 		)
 		for {
 			reply, err = robot.GetChatStream().Recv()
-			if err != nil && grpc.Code(err) == codes.Unavailable {
+			reply_status, _ := status.FromError(err)
+			if err != nil && reply_status.Code() == codes.Unavailable {
 				ConsoleLog("与服务器的连接被断开, 进行重试")
 				robot.Connect()
 				ConsoleLog("重连成功")

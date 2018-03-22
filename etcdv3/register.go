@@ -12,7 +12,7 @@ import (
 
 func Register(name string, host string, port int, target string, interval time.Duration, ttl int) error {
 	service_value := fmt.Sprintf("%s:%d", host, port)
-	service_key = fmt.Sprintf("%s/%s/%s", Prefix, name, service_value)
+	service_key = fmt.Sprintf("%s/%s/nodes/%s", Prefix, name, service_value)
 
 	var err error
 	client, err = clientv3.New(clientv3.Config{
